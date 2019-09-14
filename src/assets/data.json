@@ -1,0 +1,47 @@
+{
+    "id": 1,
+    "questions": [
+        {
+            "id": 1,
+            "title": "How are you doing this week?",
+            "input": {
+                "type": "select",
+                "properties": {
+                    "options": [
+                        "Good",
+                        "Okay",
+                        "Not Bad",
+                        "Not Great",
+                        "Bad"
+                    ]
+                }
+            },
+            "value": null
+        },
+        {
+            "id": 2,
+            "title": "How many new people this month?",
+            "input": {
+              "type": "input",
+              "properties": {
+                "type": "number"
+              }
+            },
+            "value": null
+        },
+        {
+          "id": 3,
+          "title": "Was monthly meeting held?",
+          "input": {
+            "type": "radio",
+            "properties": {
+              "options": [
+                "Yes",
+                "No"
+              ]
+            }
+          },
+          "value": null
+      }
+    ]
+}
