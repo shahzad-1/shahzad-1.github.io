@@ -6,6 +6,7 @@
     <title>PDF Splitter</title>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -28,9 +29,27 @@
             </div>
         </div>
 
+        <div class="format-selector" id="formatSelector">
+            <h4>Output Format</h4>
+            <div class="format-options">
+                <div class="format-option selected" onclick="selectFormat('pdf')">
+                    <input type="radio" id="formatPdf" name="format" value="pdf" checked>
+                    <label for="formatPdf">PDF Files</label>
+                </div>
+                <div class="format-option" onclick="selectFormat('png')">
+                    <input type="radio" id="formatPng" name="format" value="png">
+                    <label for="formatPng">PNG Images</label>
+                </div>
+                <div class="format-option" onclick="selectFormat('jpg')">
+                    <input type="radio" id="formatJpg" name="format" value="jpg">
+                    <label for="formatJpg">JPG Images</label>
+                </div>
+            </div>
+        </div>
+
         <div class="processing" id="processing" style="display: none;">
             <div class="spinner"></div>
-            <p>Processing your PDF...</p>
+            <p id="processingText">Processing your PDF...</p>
         </div>
 
         <div class="result" id="result" style="display: none;">

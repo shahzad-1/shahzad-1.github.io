@@ -1,14 +1,19 @@
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
 let zipData = null;
 let originalFileName = '';
+let selectedFormat = 'pdf';
 
 const uploadArea = document.getElementById('uploadArea');
 const fileInput = document.getElementById('fileInput');
 const processing = document.getElementById('processing');
+const processingText = document.getElementById('processingText');
 const result = document.getElementById('result');
 const error = document.getElementById('error');
 const resultMessage = document.getElementById('resultMessage');
 const errorMessage = document.getElementById('errorMessage');
 const downloadBtn = document.getElementById('downloadBtn');
+const formatSelector = document.getElementById('formatSelector');
 
 // File upload handlers
 uploadArea.addEventListener('click', () => fileInput.click());
@@ -17,6 +22,15 @@ uploadArea.addEventListener('dragleave', handleDragLeave);
 uploadArea.addEventListener('drop', handleDrop);
 fileInput.addEventListener('change', handleFileSelect);
 downloadBtn.addEventListener('click', downloadZip);
+
+function selectFormat(format) {
+    selectedFormat = format;
+    document.querySelectorAll('.format-option').forEach(opt => {
+        opt.classList.remove('selected');
+    });
+    event.target.closest('.format-option').classList.add('selected');
+    document.getElementById('format' + format.charAt(0).toUpperCase() + format.slice(1)).checked = true;
+}
 
 function handleDragOver(e) {
     e.preventDefault();
@@ -45,30 +59,33 @@ function handleFileSelect(e) {
 }
 
 async function processFile(file) {
-    // Validate file type
     if (!file.type.includes('pdf') && !file.name.toLowerCase().endsWith('.pdf')) {
         showError('Please select a PDF file.');
         return;
     }
 
-    // Store original file name (without extension)
     originalFileName = file.name.replace(/\.pdf$/i, '');
 
-    // Show processing state
     hideAllStates();
     processing.style.display = 'block';
+    processingText.textContent = 'Processing your PDF...';
 
     try {
         const arrayBuffer = await file.arrayBuffer();
-        const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
-        const totalPages = pdfDoc.getPageCount();
+        
+        if (selectedFormat === 'pdf') {
+            const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+            const totalPages = pdfDoc.getPageCount();
 
-        if (totalPages <= 1) {
-            showError('The PDF has only one page. No splitting is needed.');
-            return;
+            if (totalPages <= 1) {
+                showError('The PDF has only one page. No splitting is needed.');
+                return;
+            }
+
+            await splitPDF(pdfDoc, totalPages);
+        } else {
+            await splitPDFAsImages(arrayBuffer, selectedFormat);
         }
-
-        await splitPDF(pdfDoc, totalPages);
 
     } catch (err) {
         console.error('Error processing PDF:', err);
@@ -81,23 +98,19 @@ async function splitPDF(pdfDoc, totalPages) {
         const zip = new JSZip();
         
         for (let i = 0; i < totalPages; i++) {
-            // Create a new PDF document for each page
+            processingText.textContent = `Processing page ${i + 1} of ${totalPages}...`;
+            
             const newPdf = await PDFLib.PDFDocument.create();
             const [copiedPage] = await newPdf.copyPages(pdfDoc, [i]);
             newPdf.addPage(copiedPage);
             
-            // Generate PDF bytes
             const pdfBytes = await newPdf.save();
-            
-            // Add to zip with proper naming
             const fileName = `${originalFileName}_p${i + 1}.pdf`;
             zip.file(fileName, pdfBytes);
         }
 
-        // Generate zip file
         zipData = await zip.generateAsync({ type: 'blob' });
-        
-        showResult(totalPages);
+        showResult(totalPages, 'PDF');
 
     } catch (err) {
         console.error('Error splitting PDF:', err);
@@ -105,10 +118,55 @@ async function splitPDF(pdfDoc, totalPages) {
     }
 }
 
-function showResult(totalPages) {
+async function splitPDFAsImages(arrayBuffer, format) {
+    try {
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const totalPages = pdf.numPages;
+
+        if (totalPages <= 1) {
+            showError('The PDF has only one page. No splitting is needed.');
+            return;
+        }
+
+        const zip = new JSZip();
+        
+        for (let i = 1; i <= totalPages; i++) {
+            processingText.textContent = `Converting page ${i} of ${totalPages} to ${format.toUpperCase()}...`;
+            
+            const page = await pdf.getPage(i);
+            const viewport = page.getViewport({ scale: 2.0 });
+            
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            
+            await page.render({
+                canvasContext: context,
+                viewport: viewport
+            }).promise;
+            
+            const blob = await new Promise(resolve => {
+                canvas.toBlob(resolve, `image/${format === 'jpg' ? 'jpeg' : 'png'}`, 0.95);
+            });
+            
+            const fileName = `${originalFileName}_p${i}.${format}`;
+            zip.file(fileName, blob);
+        }
+
+        zipData = await zip.generateAsync({ type: 'blob' });
+        showResult(totalPages, format.toUpperCase());
+
+    } catch (err) {
+        console.error('Error converting PDF to images:', err);
+        showError('Error converting the PDF to images. Please try again.');
+    }
+}
+
+function showResult(totalPages, formatType) {
     hideAllStates();
     result.style.display = 'block';
-    resultMessage.textContent = `Successfully split into ${totalPages} individual PDF files.`;
+    resultMessage.textContent = `Successfully split into ${totalPages} individual ${formatType} files.`;
 }
 
 function showError(message) {
@@ -119,6 +177,7 @@ function showError(message) {
 
 function hideAllStates() {
     uploadArea.style.display = 'none';
+    formatSelector.style.display = 'none';
     processing.style.display = 'none';
     result.style.display = 'none';
     error.style.display = 'none';
@@ -140,6 +199,7 @@ function downloadZip() {
 function resetApp() {
     hideAllStates();
     uploadArea.style.display = 'block';
+    formatSelector.style.display = 'block';
     fileInput.value = '';
     zipData = null;
     originalFileName = '';
